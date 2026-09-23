@@ -1,0 +1,23 @@
+rules:
+  - name: brute_force
+    event_type: failed_password
+    threshold: 5
+    window_seconds: 3600
+
+  - name: credential_stuffing
+    event_type: failed_password
+    threshold: 3
+    window_seconds: 3600
+    distinct_column: username
+
+  - name: rate_spike
+    event_type: failed_password
+    threshold: 50
+    window_seconds: 300
+    group_by_ip: false
+
+  - name: privileged_account_target
+    event_type: failed_password
+    threshold: 1
+    window_seconds: 3600
+    username: root

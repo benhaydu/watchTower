@@ -1,0 +1,6 @@
+﻿venv/
+__pycache__/
+*.pyc
+app_database.db
+test_auth.log
+.env
