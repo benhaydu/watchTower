@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import HTMLResponse
 
 from model import LogBatch, AlertOut
 from database import init_db, insert_logs, insert_parsed_logs, get_alerts
 from parser import parse
 from rules_engine import run_rules
+from dashboard import DASHBOARD_HTML
 
 RULES_INTERVAL_SECONDS = 60
 
@@ -55,3 +57,13 @@ async def ingest(batch: LogBatch):
 @app.get("/alerts", response_model=list[AlertOut], dependencies=[Depends(verify_api_key)])
 async def alerts(limit: int = 100):
     return get_alerts(limit)
+
+
+# Deliberately NOT behind verify_api_key: this page has no data of its own --
+# it's a static shell whose JS asks the viewer for the key once (kept in the
+# browser's localStorage) and uses it to call /alerts itself, same as any
+# other client. A plain browser navigation can't attach a custom header, so
+# protecting this route the same way would make it impossible to open.
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    return DASHBOARD_HTML
