@@ -21,3 +21,8 @@ rules:
     threshold: 1
     window_seconds: 3600
     username: root
+
+  - name: username_enumeration
+    event_type: invalid_user
+    threshold: 5
+    window_seconds: 3600
