@@ -3,7 +3,7 @@ import os
 import requests
 import re
 
-LOG_FILE="test_auth.log"
+LOG_FILE = os.environ.get("WATCHTOWER_LOG_FILE", "test_auth.log")
 batch =[]
 lastLine = None
 url="http://127.0.0.1:8000/ingest"
