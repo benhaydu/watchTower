@@ -4,3 +4,5 @@ __pycache__/
 app_database.db
 test_auth.log
 .env
+
+.claude/
