@@ -282,6 +282,9 @@ def get_stats(hours: int = 24, top_n: int = 10):
                GROUP BY hour""",
             (start.strftime("%Y-%m-%d %H:%M:%S"),),
         )
+        last_event_at = rows(
+            "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', MAX(received_at)) FROM logs"
+        )[0][0]
     finally:
         conn.close()
 
@@ -295,6 +298,7 @@ def get_stats(hours: int = 24, top_n: int = 10):
     # [6] Shape the result for the browser
     return {
         "totals": {"events": total_events, "alerts": total_alerts, "unique_ips": unique_ips},
+        "last_event_at": last_event_at,
         "event_types": [{"label": r[0], "count": r[1]} for r in event_types],
         "top_ips": [{"label": r[0], "count": r[1]} for r in top_ips],
         "top_usernames": [{"label": r[0], "count": r[1]} for r in top_usernames],
