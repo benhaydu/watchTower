@@ -3,11 +3,11 @@ import secrets
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from model import LogBatch, AlertOut
-from database import init_db, insert_logs, insert_parsed_logs, get_alerts
+from database import init_db, insert_logs, insert_parsed_logs, get_alerts, get_stats
 from parser import parse
 from rules_engine import run_rules
 from dashboard import DASHBOARD_HTML
@@ -57,6 +57,10 @@ async def ingest(batch: LogBatch):
 @app.get("/alerts", response_model=list[AlertOut], dependencies=[Depends(verify_api_key)])
 async def alerts(limit: int = 100):
     return get_alerts(limit)
+
+@app.get("/stats", dependencies=[Depends(verify_api_key)])
+def stats(hours: int = Query(24, ge=1, le=168)):
+    return get_stats(hours)
 
 
 # Deliberately NOT behind verify_api_key: this page has no data of its own --

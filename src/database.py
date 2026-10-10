@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 def init_db():
     conn = sqlite3.connect("app_database.db")
@@ -221,3 +222,81 @@ def check_threshold_rule(event_type: str, threshold: int, window_seconds: int, d
     results = cursor.fetchall()
     conn.close()
     return results
+
+def get_stats(hours: int = 24, top_n: int = 10):
+    # [1] The time window
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    start = now - timedelta(hours=hours)
+
+    # [2] The connection
+    conn = sqlite3.connect("file:app_database.db?mode=ro", uri=True)
+    cursor = conn.cursor()
+
+    # [3] A small helper
+    def rows(sql, params=()):
+        cursor.execute(sql, params)
+        return cursor.fetchall()
+
+    # [4] The queries
+    try:
+        total_events = rows("SELECT COUNT(*) FROM parsed_events")[0][0]
+        total_alerts = rows("SELECT COUNT(*) FROM alerts")[0][0]
+        unique_ips = rows(
+            "SELECT COUNT(DISTINCT source_ip) FROM parsed_events WHERE source_ip IS NOT NULL"
+        )[0][0]
+
+        event_types = rows(
+            """SELECT event_type, COUNT(*) AS n
+               FROM parsed_events
+               GROUP BY event_type
+               ORDER BY n DESC"""
+        )
+
+        top_ips = rows(
+            """SELECT source_ip, COUNT(*) AS attempts
+               FROM parsed_events
+               WHERE source_ip IS NOT NULL
+                 AND event_type IN ('failed_password', 'invalid_user')
+               GROUP BY source_ip
+               ORDER BY attempts DESC
+               LIMIT ?""",
+            (top_n,),
+        )
+
+        top_usernames = rows(
+            """SELECT username, COUNT(*) AS attempts
+               FROM parsed_events
+               WHERE username IS NOT NULL
+                 AND event_type IN ('failed_password', 'invalid_user')
+               GROUP BY username
+               ORDER BY attempts DESC
+               LIMIT ?""",
+            (top_n,),
+        )
+
+        hourly = rows(
+            """SELECT strftime('%Y-%m-%dT%H:00:00Z', logs.received_at) AS hour, COUNT(*)
+               FROM parsed_events
+               JOIN logs ON parsed_events.log_id = logs.id
+               WHERE logs.received_at >= ?
+               GROUP BY hour""",
+            (start.strftime("%Y-%m-%d %H:%M:%S"),),
+        )
+    finally:
+        conn.close()
+
+    # [5] Fill in the empty hours
+    counts = dict(hourly)
+    timeline = []
+    for i in range(hours + 1):
+        label = (start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00:00Z")
+        timeline.append({"hour": label, "count": counts.get(label, 0)})
+
+    # [6] Shape the result for the browser
+    return {
+        "totals": {"events": total_events, "alerts": total_alerts, "unique_ips": unique_ips},
+        "event_types": [{"label": r[0], "count": r[1]} for r in event_types],
+        "top_ips": [{"label": r[0], "count": r[1]} for r in top_ips],
+        "top_usernames": [{"label": r[0], "count": r[1]} for r in top_usernames],
+        "timeline": timeline,
+    }
