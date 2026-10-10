@@ -9,6 +9,12 @@ lastLine = None
 url="http://127.0.0.1:8000/ingest"
 API_KEY = os.environ["WATCHTOWER_API_KEY"]
 
+def get_inode(file_path):
+    try:
+        return os.stat(file_path).st_ino
+    except FileNotFoundError:
+        return None
+
 
 def stream_log(file_path):
     print(f"Watching {os.path.abspath(file_path)}")
@@ -17,12 +23,19 @@ def stream_log(file_path):
     with open(file_path, "r") as f:
         f.seek(0, 2)
         position = f.tell()
+    last_inode = get_inode(file_path)
 
     batch = []
     start_time = time.perf_counter()
     MAX_TIME = 10
 
     while True:
+        current_inode = get_inode(file_path)
+        current_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        if current_inode != last_inode or current_size < position:
+            position = 0
+            last_inode = current_inode
+
         with open(file_path, "r") as f:
             f.seek(position)
             new_lines = f.readlines()
