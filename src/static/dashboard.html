@@ -25,6 +25,8 @@
   <ul id="event-list"></ul>
   <ul id="username-list"></ul>
 
+  <p id="heartbeat">...</p>
+
   <script>
 "use strict";
 
@@ -45,6 +47,9 @@ async function load() {
       renderList(document.getElementById("ip-list"),   s.top_ips);
       renderList(document.getElementById("username-list"), s.top_usernames);
       renderList(document.getElementById("event-list"), s.event_types);
+
+      renderHeartbeat(getHeartbeat(s.last_event_at));
+
 
         document.getElementById("msg").textContent = "";
         if (s.totals){
@@ -90,6 +95,32 @@ function renderList(container, rows) {
       container.append(newLi);
     }
   
+}
+
+function getHeartbeat(lastEventAt){
+  if(lastEventAt){
+    const ageMinutes = (Date.now() - new Date(lastEventAt).getTime()) / 60000;
+    if (ageMinutes < 15){
+      return "live";
+    }else if(ageMinutes < 60){
+      return "delayed";
+    }else{
+      return "stalled";
+    }
+  }else{
+    return "none";
+  }
+}
+function renderHeartbeat(state){
+  const LABELS = {
+    live: "Live",
+    delayed: "Delayed",
+    stalled: "Down",
+    none: "No data"
+  }
+  const el = document.getElementById("heartbeat");
+  el.dataset.state = state;          //state key for css
+  el.textContent = LABELS[state];    // the display text
 }
 
 
