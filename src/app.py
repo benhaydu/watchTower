@@ -1,7 +1,8 @@
 import os
 import secrets
 from contextlib import asynccontextmanager
-
+from pathlib import Path
+from fastapi.responses import FileResponse
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -10,7 +11,6 @@ from model import LogBatch, AlertOut
 from database import init_db, insert_logs, insert_parsed_logs, get_alerts, get_stats
 from parser import parse
 from rules_engine import run_rules
-from dashboard import DASHBOARD_HTML
 
 RULES_INTERVAL_SECONDS = 60
 
@@ -68,6 +68,6 @@ def stats(hours: int = Query(24, ge=1, le=168)):
 # browser's localStorage) and uses it to call /alerts itself, same as any
 # other client. A plain browser navigation can't attach a custom header, so
 # protecting this route the same way would make it impossible to open.
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    return DASHBOARD_HTML
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return FileResponse(Path(__file__).parent / "static" / "dashboard.html")

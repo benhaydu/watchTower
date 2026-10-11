@@ -1,0 +1,99 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watchtower</title>
+</head>
+<body>
+  <h1>Watchtower</h1>
+  <form id="login-form">
+    <input id="key-input" type="password" placeholder="API key">
+    <button type="submit">Open</button>
+  </form>
+  <div class ="dashboard-header">
+  <h3>Total Events: <span id="event-count">-</span></h3>
+  <h3>Total alerts: <span id="alert-count">-</span></h3>
+  <h3>Unique ips: <span id="ip-count">-</span></h3>
+  </div>
+
+  
+ 
+  <p id="msg">waiting…</p>
+
+  <ul id="ip-list"></ul>
+  <ul id="event-list"></ul>
+  <ul id="username-list"></ul>
+
+  <script>
+"use strict";
+
+const nf = new Intl.NumberFormat();
+
+async function load() {
+  const key = localStorage.getItem("watchtower_key");
+  if (!key) { 
+    document.getElementById("msg").textContent = "no key saved"; 
+    return; 
+  }
+
+  try {
+    const res = await fetch("/stats?hours=24", { headers: { "X-API-Key": key } });
+    if (res.ok){
+        const s = await res.json();
+
+      renderList(document.getElementById("ip-list"),   s.top_ips);
+      renderList(document.getElementById("username-list"), s.top_usernames);
+      renderList(document.getElementById("event-list"), s.event_types);
+
+        document.getElementById("msg").textContent = "";
+        if (s.totals){
+            document.getElementById("event-count").textContent = nf.format(s.totals.events);
+            document.getElementById("alert-count").textContent = nf.format(s.totals.alerts);
+            document.getElementById("ip-count").textContent = nf.format(s.totals.unique_ips);
+        }
+
+    }else if (res.status === 401 ){
+      localStorage.removeItem("watchtower_key");
+      document.getElementById("msg").textContent = "That key was rejected";
+    } else{
+      document.getElementById("msg").textContent = "Server error (" + res.status + ").";
+    }
+    
+  } catch (error) {
+    document.getElementById("msg").textContent = "Error loading data: " + error.message;
+  }
+}
+
+
+document.getElementById("login-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  localStorage.setItem("watchtower_key", document.getElementById("key-input").value.trim());
+  load();
+
+});
+
+function renderList(container, rows) {
+  // 1. empty the container, so refreshes don't pile up duplicates
+    container.replaceChildren();
+  // 2. if rows is empty, show 
+    if (rows.length === 0){
+      const emptyLi = document.createElement("li");
+      emptyLi.textContent = "No rows returned";
+      container.append(emptyLi);
+      return;
+    }
+    // 3. for each row: create an <li>, put the label and count into it, add it to the container
+    for(const row of rows){
+      const newLi = document.createElement("li");
+      newLi.textContent = row.label + " " + nf.format(row.count);
+      container.append(newLi);
+    }
+  
+}
+
+
+load();
+</script>
+</body>
+</html>
