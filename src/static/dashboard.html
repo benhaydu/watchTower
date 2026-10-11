@@ -1,130 +1,247 @@
 ﻿<!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Watchtower</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --series: #3987e5;
+      --good: #0ca30c;
+      --warning: #fab219;
+      --critical: #d03b3b;
+    }
+
+    body {
+      background-color: var(--page);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    #heartbeat[data-state="stalled"] {
+      color: var(--critical);
+    }
+
+    #heartbeat[data-state="none"] {
+      color: var(--muted);
+    }
+
+    #heartbeat[data-state="delayed"] {
+      color: var(--warning);
+    }
+
+    #heartbeat[data-state="live"] {
+      color: var(--good);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .lists {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    li {
+  display: grid;
+  grid-template-columns: 40% 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.track { 
+  display: flex; 
+  align-items: center;
+ }
+ .bar{
+  height: 18px;
+  background: var(--series);
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+ }
+ .bar-value{
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--ink);
+ }
+ .bar-label {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+  </style>
 </head>
+
 <body>
   <h1>Watchtower</h1>
   <form id="login-form">
     <input id="key-input" type="password" placeholder="API key">
     <button type="submit">Open</button>
   </form>
-  <div class ="dashboard-header">
-  <h3>Total Events: <span id="event-count">-</span></h3>
-  <h3>Total alerts: <span id="alert-count">-</span></h3>
-  <h3>Unique ips: <span id="ip-count">-</span></h3>
+  <div class="dashboard-header">
+    <h3>Total Events: <span id="event-count">-</span></h3>
+    <h3>Total alerts: <span id="alert-count">-</span></h3>
+    <h3>Unique ips: <span id="ip-count">-</span></h3>
   </div>
 
-  
- 
+
   <p id="msg">waiting…</p>
 
-  <ul id="ip-list"></ul>
-  <ul id="event-list"></ul>
-  <ul id="username-list"></ul>
 
+  <div class="lists">
+    <section class="card">
+      <h2>Top Ips</h2>
+      <ul id="ip-list"></ul>
+    </section>
+    <section class="card">
+      <h2>Event Types</h2>
+      <ul id="event-list"></ul>
+    </section>
+    <section class="card">
+      <h2>Top Usernames</h2>
+      <ul id="username-list"></ul>
+    </section>
+  </div>
   <p id="heartbeat">...</p>
 
   <script>
-"use strict";
+    "use strict";
 
-const nf = new Intl.NumberFormat();
+    const nf = new Intl.NumberFormat();
 
-async function load() {
-  const key = localStorage.getItem("watchtower_key");
-  if (!key) { 
-    document.getElementById("msg").textContent = "no key saved"; 
-    return; 
-  }
+    async function load() {
+      const key = localStorage.getItem("watchtower_key");
+      if (!key) {
+        document.getElementById("msg").textContent = "no key saved";
+        return;
+      }
 
-  try {
-    const res = await fetch("/stats?hours=24", { headers: { "X-API-Key": key } });
-    if (res.ok){
-        const s = await res.json();
+      try {
+        const res = await fetch("/stats?hours=24", { headers: { "X-API-Key": key } });
+        if (res.ok) {
+          const s = await res.json();
 
-      renderList(document.getElementById("ip-list"),   s.top_ips);
-      renderList(document.getElementById("username-list"), s.top_usernames);
-      renderList(document.getElementById("event-list"), s.event_types);
+          renderList(document.getElementById("ip-list"), s.top_ips);
+          renderList(document.getElementById("username-list"), s.top_usernames);
+          renderList(document.getElementById("event-list"), s.event_types);
 
-      renderHeartbeat(getHeartbeat(s.last_event_at));
+          renderHeartbeat(getHeartbeat(s.last_event_at));
 
 
-        document.getElementById("msg").textContent = "";
-        if (s.totals){
+          document.getElementById("msg").textContent = "";
+          if (s.totals) {
             document.getElementById("event-count").textContent = nf.format(s.totals.events);
             document.getElementById("alert-count").textContent = nf.format(s.totals.alerts);
             document.getElementById("ip-count").textContent = nf.format(s.totals.unique_ips);
+          }
+
+        } else if (res.status === 401) {
+          localStorage.removeItem("watchtower_key");
+          document.getElementById("msg").textContent = "That key was rejected";
+        } else {
+          document.getElementById("msg").textContent = "Server error (" + res.status + ").";
         }
 
-    }else if (res.status === 401 ){
-      localStorage.removeItem("watchtower_key");
-      document.getElementById("msg").textContent = "That key was rejected";
-    } else{
-      document.getElementById("msg").textContent = "Server error (" + res.status + ").";
+      } catch (error) {
+        document.getElementById("msg").textContent = "Error loading data: " + error.message;
+      }
     }
-    
-  } catch (error) {
-    document.getElementById("msg").textContent = "Error loading data: " + error.message;
-  }
-}
 
 
-document.getElementById("login-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  localStorage.setItem("watchtower_key", document.getElementById("key-input").value.trim());
-  load();
+    document.getElementById("login-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      localStorage.setItem("watchtower_key", document.getElementById("key-input").value.trim());
+      load();
 
-});
+    });
 
-function renderList(container, rows) {
-  // 1. empty the container, so refreshes don't pile up duplicates
-    container.replaceChildren();
-  // 2. if rows is empty, show 
-    if (rows.length === 0){
-      const emptyLi = document.createElement("li");
-      emptyLi.textContent = "No rows returned";
-      container.append(emptyLi);
-      return;
+    function renderList(container, rows) {
+      // 1. empty the container, so refreshes don't pile up duplicates
+      container.replaceChildren();
+      // 2. if rows is empty, show 
+      if (rows.length === 0) {
+        const emptyLi = document.createElement("li");
+        emptyLi.textContent = "No rows returned";
+        container.append(emptyLi);
+        return;
+      }
+      const max = Math.max(...rows.map(r => r.count));
+      for (const row of rows) {
+        //create bar
+        const newBar = document.createElement("span")
+        newBar.style.width = (row.count / max) * 80 + "%"
+        newBar.className = "bar";
+        //create label
+        const newLabel = document.createElement("span")
+        newLabel.textContent = row.label
+        newLabel.className = "bar-label";
+        //create count
+        const newCount = document.createElement("span");
+        newCount.textContent = nf.format(row.count);
+        newCount.className = "bar-value";
+
+        const li = document.createElement("li");
+        li.title = row.label + ": " + nf.format(row.count);
+
+        const track = document.createElement("span");
+        track.className = "track";
+
+        track.append(newBar, newCount);   // bar and number go in the wrapper
+        li.append(newLabel, track);       // label and wrapper go in the row
+        container.append(li);             // the row goes in the list
+
+      }
+
     }
-    // 3. for each row: create an <li>, put the label and count into it, add it to the container
-    for(const row of rows){
-      const newLi = document.createElement("li");
-      newLi.textContent = row.label + " " + nf.format(row.count);
-      container.append(newLi);
+
+    function getHeartbeat(lastEventAt) {
+      if (lastEventAt) {
+        const ageMinutes = (Date.now() - new Date(lastEventAt).getTime()) / 60000;
+        if (ageMinutes < 15) {
+          return "live";
+        } else if (ageMinutes < 60) {
+          return "delayed";
+        } else {
+          return "stalled";
+        }
+      } else {
+        return "none";
+      }
     }
-  
-}
-
-function getHeartbeat(lastEventAt){
-  if(lastEventAt){
-    const ageMinutes = (Date.now() - new Date(lastEventAt).getTime()) / 60000;
-    if (ageMinutes < 15){
-      return "live";
-    }else if(ageMinutes < 60){
-      return "delayed";
-    }else{
-      return "stalled";
+    function renderHeartbeat(state) {
+      const LABELS = {
+        live: "Live",
+        delayed: "Delayed",
+        stalled: "Down",
+        none: "No data"
+      }
+      const el = document.getElementById("heartbeat");
+      el.dataset.state = state;          //state key for css
+      el.textContent = LABELS[state];    // the display text
     }
-  }else{
-    return "none";
-  }
-}
-function renderHeartbeat(state){
-  const LABELS = {
-    live: "Live",
-    delayed: "Delayed",
-    stalled: "Down",
-    none: "No data"
-  }
-  const el = document.getElementById("heartbeat");
-  el.dataset.state = state;          //state key for css
-  el.textContent = LABELS[state];    // the display text
-}
 
 
-load();
-</script>
+    load();
+  </script>
 </body>
+
 </html>
