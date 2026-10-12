@@ -98,6 +98,24 @@
       position: relative;
       height: 260px;
     }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 500;
+      padding: 6px 8px;
+    }
+
+    td {
+      padding: 6px 8px;
+      border-top: 1px solid var(--border);
+      color: var(--ink-2);
+    }
   </style>
 </head>
 
@@ -140,6 +158,21 @@
   </section>
   <p id="heartbeat">...</p>
 
+  <section class="card">
+    <h2>Recent Alerts</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Rule</th>
+          <th>IP</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody id="alerts-body"></tbody>
+    </table>
+  </section>
+
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
     integrity="sha384-zYPBGXwO4633CABX/5Spf6emCKUJCfoOkhOMYyxMsatqQZPnDblmmOewfjsIVWCM" crossorigin="anonymous">
@@ -151,6 +184,10 @@
     const nf = new Intl.NumberFormat();
     let timelineChart = null;   // holds the Chart instance between refreshes
     let timelinePoints = [];
+
+    function parseDbTime(s) {
+      return new Date(s.replace(" ", "T") + "Z");
+    }
 
 
     function renderTimeline(points) {
@@ -255,6 +292,16 @@
       } catch (error) {
         document.getElementById("msg").textContent = "Error loading data: " + error.message;
       }
+      try {
+        const res = await fetch("/alerts?limit=15", { headers: { "X-API-Key": key } })
+        if (res.ok) {
+          const s = await res.json();
+          renderAlerts(s);
+        }
+
+      } catch (error) {
+        document.getElementById("msg").textContent = "Error loading data: " + error.message;
+      }
     }
 
 
@@ -264,6 +311,38 @@
       load();
 
     });
+
+    function renderAlerts(rows) {
+      const body = document.getElementById("alerts-body");
+      body.replaceChildren();                       // no duplicates on refresh
+
+      if (rows.length === 0) {
+        const newRow = document.createElement("tr");
+        const cell1 = document.createElement("td");
+        cell1.colSpan = 4;
+        cell1.textContent = "No Alerts yet"
+        newRow.append(cell1)
+        body.append(newRow)
+        return;
+      }
+
+      for (const a of rows) {
+        const tr = document.createElement("tr");
+        const cell1 = document.createElement("td");
+        const cell2 = document.createElement("td");
+        const cell3 = document.createElement("td");
+        const cell4 = document.createElement("td");
+
+        cell1.textContent = parseDbTime(a.triggered_at).toLocaleString();
+        cell2.textContent = a.rule_name;
+        cell3.textContent = a.matched_entity ?? "-";
+        cell4.textContent = nf.format(a.count);
+
+        tr.append(cell1, cell2, cell3, cell4);
+        body.append(tr);
+
+      }
+    }
 
     function renderList(container, rows) {
       // 1. empty the container, so refreshes don't pile up duplicates
