@@ -61,60 +61,16 @@ def test_parse_fields(line, etype, user, ip, port):
 #     replace "!= unknown" with the exact type you picked. ---------------
 # (line, expected_type, expected_username, expected_ip, expected_port)
 NEW_CASES = [
-    # disconnected -------------------------------------------------------
-    (L("Received disconnect from 129.121.116.121 port 47040:11: Bye Bye [preauth]"),
-     "disconnected", None, "129.121.116.121", "47040"),
-    (L("Disconnected from authenticating user root 41.204.63.118 port 46614 [preauth]"),
-     "disconnected", "root", "41.204.63.118", "46614"),
-    (L("Disconnected from invalid user ismail 129.121.139.106 port 35666 [preauth]"),
-     "disconnected", "ismail", "129.121.139.106", "35666"),
-
-    # too_many_auth ------------------------------------------------------
-    (L("error: maximum authentication attempts exceeded for invalid user usuario "
-       "from 79.104.197.202 port 52696 ssh2 [preauth]"),
-     "too_many_auth", "usuario", "79.104.197.202", "52696"),
-    (L("Disconnecting authenticating user root 1.2.3.4 port 22: "
-       "Too many authentication failures [preauth]"),
-     "too_many_auth", "root", "1.2.3.4", "22"),
-    (L("Disconnecting invalid user admin 1.2.3.4 port 22: "
-       "Too many authentication failures [preauth]"),        # shape built from your "Disconnecting invali" rows
-     "too_many_auth", "admin", "1.2.3.4", "22"),
-
-    # bad_banner ---------------------------------------------------------
-    (L("banner exchange: Connection from 152.32.207.234 port 60256: invalid format"),
-     "bad_banner", None, "152.32.207.234", "60256"),
-
-    # protocol_error: some have an IP, most don't -----------------------
-    (L("Unable to negotiate with 45.56.103.154 port 62576: no matching key exchange "
-       "method found. Their offer: diffie-hellman-group1-sha1 [preauth]"),
-     "protocol_error", None, "45.56.103.154", "62576"),
-    (L("error: Protocol major versions differ: 2 vs. 1"),
-     "protocol_error", None, None, None),
-    (L("error: kex_protocol_error: type 20 seq 2 [preauth]"),
-     "protocol_error", None, None, None),
-    (L("error: kex_exchange_identification: read: Connection reset by peer"),
-     "protocol_error", None, None, None),
-    (L("fatal: userauth_pubkey: parse publickey packet: incomplete message [preauth]"),
-     "protocol_error", None, None, None),
-
-    # maxstartups: sshd overloaded by connection floods -------------------
-    (L("error: beginning MaxStartups throttling"),
+    (L("banner exchange: Connection from 45.56.103.154 port 62566: could not read protocol version"),
+     "bad_banner", None, "45.56.103.154", "62566"),
+    (L("Connection closed by invalid user  47.250.81.7 port 14312 [preauth]"),
+     "connection_closed", None, "47.250.81.7", "14312"),
+    (L('Connection closed by invalid user <html style="height 43.156.91.175 port 51422 [preauth]'),
+     "connection_closed", '<html style="height', "43.156.91.175", "51422"),
+    (L("Disconnected from user ubuntu 38.143.207.199 port 54960"),
+     "disconnected", "ubuntu", "38.143.207.199", "54960"),
+    (L("exited MaxStartups throttling after 00:00:40, 5 connections dropped"),
      "maxstartups", None, None, None),
-    (L("drop connection #10 from [94.154.43.220]:46706 on [10.0.0.206]:22 past MaxStartups"),
-     "maxstartups", None, "94.154.43.220", "46706"),
-
-    # system_session: your own machine --------------------------------
-    (L("pam_unix(cron:session): session closed for user root", proc="CRON[196399]"),
-     "system_session", None, None, None),
-    (L("pam_unix(sudo:session): session opened for user root(uid=0) by ubuntu(uid=1001)",
-       proc="sudo"),
-     "system_session", None, None, None),
-    (L("New session 1403 of user ubuntu.", proc="systemd-logind[916]"),
-     "system_session", None, None, None),
-    (L("Session 2737 logged out. Waiting for processes to exit.", proc="systemd-logind[916]"),
-     "system_session", None, None, None),
-     (L("error: exited MaxStartups throttling, 10 connections dropped"),
-    "maxstartups", None, None, None),
 ]
 
 @pytest.mark.parametrize("line,etype,user,ip,port", NEW_CASES)

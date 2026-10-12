@@ -16,11 +16,16 @@ Add more compiled patterns + PATTERNS entries as you support more event types.
 """
 
 import re
-from database import get_unparsed_logs, insert_parsed_logs
+from collections import Counter
+from database import (
+    get_unparsed_logs, insert_parsed_logs,
+    get_unknown_events, update_parsed_events,
+)
 
 IP = r"(?P<source_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
 PORT = r"(?P<port>\d+)"
 USER = r"(?P<username>\S+)"
+LOOSE_USER = r"(?P<username>.*?)"
 
 PATTERNS = [
     ("failed_password", rf"Failed password for (?:invalid user )?{USER} from {IP} port {PORT}"),
@@ -31,15 +36,15 @@ PATTERNS = [
 
     ("invalid_user", rf"Invalid user (?P<username>(?:(?! from ).)*) from {IP} port {PORT}"),
 
-    ("connection_reset", rf"Connection reset by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+    ("connection_reset", rf"Connection reset by (?:(?:authenticating|invalid) user {LOOSE_USER} )?{IP} port {PORT}"),
 
-    ("connection_closed", rf"Connection closed by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+    ("connection_closed", rf"Connection closed by (?:(?:authenticating|invalid) user {LOOSE_USER} )?{IP} port {PORT}"),
 
     ("sudo_command", r"sudo:\s*(?P<username>\S+)\s*:.*USER=(?P<target_user>\S+)\s*;\s*COMMAND=(?P<command>.+)"),
 
-    ("disconnected", rf"(?:Received disconnect|Disconnected) from (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+    ("disconnected", rf"(?:Received disconnect|Disconnected) from (?:(?:(?:authenticating|invalid) )?user {LOOSE_USER} )?{IP} port {PORT}"),
 
-    ("bad_banner", rf"banner exchange: Connection from {IP} port {PORT}: invalid format"),
+    ("bad_banner", rf"banner exchange: Connection from {IP} port {PORT}: (?:invalid format|could not read protocol version)"),
 
     ("too_many_auth", rf"maximum authentication attempts exceeded for (?:invalid user )?{USER} from {IP} port {PORT}"),
     ("too_many_auth", rf"Disconnecting (?:authenticating|invalid) user {USER} {IP} port {PORT}: Too many authentication failures"),
@@ -49,7 +54,7 @@ PATTERNS = [
     ("protocol_error", rf"fatal: userauth_pubkey"),
 
 
-    ("maxstartups", rf"error: (?:beginning|exited) MaxStartups throttling"),
+    ("maxstartups", rf"(?:beginning|exited) MaxStartups throttling"),
     ("maxstartups", rf"drop connection #\d+ from \[{IP}\]:{PORT} on"),
 
     ("system_session", rf"pam_unix\((?:cron|sudo|sshd):session\)"),
@@ -80,6 +85,33 @@ def parse(line):
 
     return "unknown", None, None, None, None, None
 
+def reparse_unknown(dry_run=True):
+    events = get_unknown_events()
+    updates = []
+    counts = Counter()
+    leftovers = []                                   # CHANGE 1: new list, before the loop
+
+    for event_id, raw_line in events:
+        parsed_line = parse(raw_line)
+        counts[parsed_line[0]] += 1
+        if parsed_line[0] != "unknown":
+            updates.append(parsed_line + (event_id,))
+        else:                                        # CHANGE 2: collect the unparsed lines
+            leftovers.append(raw_line)
+
+    print(f"Examined {len(events)} unknown rows:")
+    for event_type, n in counts.most_common():
+        label = "still unknown" if event_type == "unknown" else event_type
+        print(f"  {label:<18} {n}")                  # 16 -> 18 so connection_closed lines up
+
+    for line in leftovers[:30]:                      # CHANGE 3: print them, after the counts
+        print("  ?", line)
+
+    if dry_run:
+        print(f"DRY RUN: would update {len(updates)} rows. Nothing was changed.")
+    else:
+        update_parsed_events(updates)
+        print(f"Updated {len(updates)} rows.")
 
 def run_parser():
     """Manual backfill/debug tool: parses any rows already in `logs` that
@@ -97,4 +129,8 @@ def run_parser():
 
 
 if __name__ == "__main__":
-    run_parser()
+    import sys
+    if "--reparse" in sys.argv:
+        reparse_unknown(dry_run="--apply" not in sys.argv)
+    else:
+        run_parser()

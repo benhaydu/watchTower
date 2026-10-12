@@ -40,6 +40,34 @@ def init_db():
     conn.close()
 
 
+def get_unknown_events():
+    conn = sqlite3.connect("file:app_database.db?mode=ro", uri=True)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        SELECT parsed_events.id, logs.raw_line 
+        FROM parsed_events JOIN logs ON parsed_events.log_id = logs.id
+        WHERE event_type = 'unknown'
+        """)
+        unknown_events = cursor.fetchall()
+    finally:
+        conn.close()
+    return unknown_events
+    
+def update_parsed_events(updates):
+    conn = sqlite3.connect("app_database.db")
+    try:
+        with conn:                       # commit on success, roll back if anything inside raises
+            conn.executemany(
+                """UPDATE parsed_events
+                   SET event_type = ?, username = ?, source_ip = ?, port = ?,
+                       target_user = ?, command = ?
+                   WHERE id = ? AND event_type = 'unknown'""",
+                (updates)
+            )
+    finally:
+        conn.close()
+
 def is_suppressed(rule_name: str, matched_entity: str, suppression_seconds: int) -> bool:
     """True if this exact (rule_name, matched_entity) already alerted within
     the last suppression_seconds -- i.e. this would be a repeat of an alert
