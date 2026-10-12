@@ -23,22 +23,44 @@ PORT = r"(?P<port>\d+)"
 USER = r"(?P<username>\S+)"
 
 PATTERNS = [
-    # "invalid user" is an optional prefix here (rather than a separate pattern)
-    # so a failed login against a nonexistent account still counts as event_type
-    # failed_password -- brute_force/credential_stuffing rules should treat it
-    # the same as any other failed attempt.
     ("failed_password", rf"Failed password for (?:invalid user )?{USER} from {IP} port {PORT}"),
+
     ("accepted_password", rf"Accepted password for {USER} from {IP} port {PORT}"),
+
     ("accepted_publickey", rf"Accepted publickey for {USER} from {IP} port {PORT}"),
-    # Distinct from failed_password: sshd logs this BEFORE any password is even
-    # checked, when the username itself doesn't exist locally -- useful as a
-    # username-enumeration signal on its own (see rules.yaml: username_enumeration).
+
     ("invalid_user", rf"Invalid user (?P<username>(?:(?! from ).)*) from {IP} port {PORT}"),
+
     ("connection_reset", rf"Connection reset by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+
     ("connection_closed", rf"Connection closed by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
-    # Local privilege escalation -- no source_ip/port (it's not a network event),
-    # but captures which account was escalated TO and what was run.
+
     ("sudo_command", r"sudo:\s*(?P<username>\S+)\s*:.*USER=(?P<target_user>\S+)\s*;\s*COMMAND=(?P<command>.+)"),
+
+    ("disconnected", rf"(?:Received disconnect|Disconnected) from (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+
+    ("bad_banner", rf"banner exchange: Connection from {IP} port {PORT}: invalid format"),
+
+    ("too_many_auth", rf"maximum authentication attempts exceeded for (?:invalid user )?{USER} from {IP} port {PORT}"),
+    ("too_many_auth", rf"Disconnecting (?:authenticating|invalid) user {USER} {IP} port {PORT}: Too many authentication failures"),
+
+    ("protocol_error", rf"Unable to negotiate with {IP} port {PORT}:"),
+    ("protocol_error", rf"error: (?:kex_exchange_identification|kex_protocol_error|Protocol major versions differ)"),
+    ("protocol_error", rf"fatal: userauth_pubkey"),
+
+
+    ("maxstartups", rf"error: (?:beginning|exited) MaxStartups throttling"),
+    ("maxstartups", rf"drop connection #\d+ from \[{IP}\]:{PORT} on"),
+
+    ("system_session", rf"pam_unix\((?:cron|sudo|sshd):session\)"),
+    ("system_session", rf"New session \d+ of user"),
+    ("system_session", rf"Session \d+ logged out"),
+    ("system_session", rf"Removed session \d+"),
+
+
+
+
+
 ]
 
 
