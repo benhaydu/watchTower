@@ -71,6 +71,13 @@ NEW_CASES = [
      "disconnected", "ubuntu", "38.143.207.199", "54960"),
     (L("exited MaxStartups throttling after 00:00:40, 5 connections dropped"),
      "maxstartups", None, None, None),
+    (L("pam_unix(systemd-user:session): session opened for user ubuntu(uid=1001) by ubuntu(uid=0)",
+       proc="(systemd)"),
+     "system_session", None, None, None),
+    (L("The system will reboot now!", proc="systemd-logind[916]"),
+     "system_reboot", None, None, None),
+    (L("System is rebooting.", proc="systemd-logind[916]"),
+     "system_reboot", None, None, None),
 ]
 
 @pytest.mark.parametrize("line,etype,user,ip,port", NEW_CASES)

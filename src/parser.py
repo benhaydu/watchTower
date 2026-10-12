@@ -57,10 +57,12 @@ PATTERNS = [
     ("maxstartups", rf"(?:beginning|exited) MaxStartups throttling"),
     ("maxstartups", rf"drop connection #\d+ from \[{IP}\]:{PORT} on"),
 
-    ("system_session", rf"pam_unix\((?:cron|sudo|sshd):session\)"),
+    ("system_session", rf"pam_unix\((?:cron|sudo|sshd|systemd-user):session\)"),
     ("system_session", rf"New session \d+ of user"),
     ("system_session", rf"Session \d+ logged out"),
     ("system_session", rf"Removed session \d+"),
+
+    ("system_reboot", rf"(?i)(?:the )?system (?:will reboot now|is rebooting)")
 
 
 
