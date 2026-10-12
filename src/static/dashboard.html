@@ -60,34 +60,44 @@
       margin: 0;
       padding: 0;
     }
-   .lists li {
-  display: grid;
-  grid-template-columns: 40% 1fr;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.track { 
-  display: flex; 
-  align-items: center;
- }
- .bar{
-  height: 18px;
-  background: var(--series);
-  border-radius: 0 4px 4px 0;
-  min-width: 2px;
- }
- .bar-value{
-  margin-left: 8px;
-  font-size: 14px;
-  color: var(--ink);
- }
- .bar-label {
-  color: var(--ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
+    .lists li {
+      display: grid;
+      grid-template-columns: 40% 1fr;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .track {
+      display: flex;
+      align-items: center;
+    }
+
+    .bar {
+      height: 18px;
+      background: var(--series);
+      border-radius: 0 4px 4px 0;
+      min-width: 2px;
+    }
+
+    .bar-value {
+      margin-left: 8px;
+      font-size: 14px;
+      color: var(--ink);
+    }
+
+    .bar-label {
+      color: var(--ink-2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 260px;
+    }
   </style>
 </head>
 
@@ -121,12 +131,92 @@
       <ul id="username-list"></ul>
     </section>
   </div>
+
+  <section class="card">
+    <h2>Events per hour (last 24h)</h2>
+    <div class="chart-wrap">
+      <canvas id="timeline-chart"></canvas>
+    </div>
+  </section>
   <p id="heartbeat">...</p>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
+    integrity="sha384-zYPBGXwO4633CABX/5Spf6emCKUJCfoOkhOMYyxMsatqQZPnDblmmOewfjsIVWCM" crossorigin="anonymous">
+    </script>
 
   <script>
     "use strict";
 
     const nf = new Intl.NumberFormat();
+    let timelineChart = null;   // holds the Chart instance between refreshes
+    let timelinePoints = [];
+
+
+    function renderTimeline(points) {
+      timelinePoints = points;
+      // 1. turn the 25 {hour, count} objects into two parallel arrays
+      //    labels: "10 AM", "11 AM"... in YOUR local time (hour is UTC ISO, e.g. "2026-10-12T17:00:00Z")
+      const labels = points.map(p =>
+        new Date(p.hour).toLocaleTimeString([], { hour: "numeric" })
+      );
+      //    data: just the numbers
+      const data = points.map(p => p.count);
+
+      // 2. second and later refreshes: the chart already exists, so swap the data
+      //    in place and redraw. Don't create a new chart on the same canvas.
+      if (timelineChart) {
+        timelineChart.data.labels = labels;
+        timelineChart.data.datasets[0].data = data;
+        timelineChart.update();
+        return;
+      }
+
+      // 3. first run: create the chart
+      const canvas = document.getElementById("timeline-chart");
+      timelineChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            borderColor: "#3987e5",  // (canvas can't read CSS vars directly)
+            borderWidth: 2,
+            pointRadius: 0,           // no dots; the line is the point
+            tension: 0.2,
+            backgroundColor: "rgba(57, 135, 229, 0.15)",   //  --series blue at 15% opacity
+            fill: true
+
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,   // fill the 260px .chart-wrap instead of keeping a fixed ratio
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                // title = the top line of the tooltip. Default is just "11 AM".
+                // items[0].dataIndex is which point you're hovering (0..24)
+                title: (items) => {
+                  const iso = timelinePoints[items[0].dataIndex].hour;
+                  return new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric" });
+                },
+                // label = the line with the number. ctx.parsed.y is the count.
+                label: (ctx) => {
+                  const isLast = ctx.dataIndex === ctx.dataset.data.length - 1;
+                  return nf.format(ctx.parsed.y) + " events" + (isLast ? " (so far)" : "");
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: "#c3c2b7", maxTicksLimit: 8 }, grid: { color: "rgba(255,255,255,0.08)" } },
+            y: { beginAtZero: true, ticks: { color: "#c3c2b7" }, grid: { color: "rgba(255,255,255,0.08)" } }
+          }
+        }
+      });
+    }
 
     async function load() {
       const key = localStorage.getItem("watchtower_key");
@@ -139,6 +229,7 @@
         const res = await fetch("/stats?hours=24", { headers: { "X-API-Key": key } });
         if (res.ok) {
           const s = await res.json();
+          renderTimeline(s.timeline);
 
           renderList(document.getElementById("ip-list"), s.top_ips);
           renderList(document.getElementById("username-list"), s.top_usernames);
