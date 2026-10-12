@@ -33,9 +33,9 @@ PATTERNS = [
     # Distinct from failed_password: sshd logs this BEFORE any password is even
     # checked, when the username itself doesn't exist locally -- useful as a
     # username-enumeration signal on its own (see rules.yaml: username_enumeration).
-    ("invalid_user", rf"Invalid user {USER} from {IP} port {PORT}"),
-    ("connection_reset", rf"Connection reset by authenticating user {USER} {IP} port {PORT}"),
-    ("connection_closed", rf"Connection closed by authenticating user {USER} {IP} port {PORT}"),
+    ("invalid_user", rf"Invalid user (?P<username>(?:(?! from ).)*) from {IP} port {PORT}"),
+    ("connection_reset", rf"Connection reset by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
+    ("connection_closed", rf"Connection closed by (?:(?:authenticating|invalid) user {USER} )?{IP} port {PORT}"),
     # Local privilege escalation -- no source_ip/port (it's not a network event),
     # but captures which account was escalated TO and what was run.
     ("sudo_command", r"sudo:\s*(?P<username>\S+)\s*:.*USER=(?P<target_user>\S+)\s*;\s*COMMAND=(?P<command>.+)"),
@@ -49,7 +49,7 @@ def parse(line):
             fields = match.groupdict()
             return (
                 event_type,
-                fields.get("username"),
+                fields.get("username") or None,
                 fields.get("source_ip"),
                 fields.get("port"),
                 fields.get("target_user"),
