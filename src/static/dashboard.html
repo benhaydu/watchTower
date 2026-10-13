@@ -116,6 +116,15 @@
       border-top: 1px solid var(--border);
       color: var(--ink-2);
     }
+
+    td[data-rule="persistent_scanner"] {
+      color: var(--warning);
+    }
+
+    td[data-rule="auth_limit_hit"] {
+      color: var(--critical);
+    }
+    
   </style>
 </head>
 
@@ -316,6 +325,7 @@
       const body = document.getElementById("alerts-body");
       body.replaceChildren();                       // no duplicates on refresh
 
+
       if (rows.length === 0) {
         const newRow = document.createElement("tr");
         const cell1 = document.createElement("td");
@@ -335,6 +345,8 @@
 
         cell1.textContent = parseDbTime(a.triggered_at).toLocaleString();
         cell2.textContent = a.rule_name;
+        cell2.dataset.rule = a.rule_name;   // becomes data-rule="persistent_scanner" in the HTML
+
         cell3.textContent = a.matched_entity ?? "-";
         cell4.textContent = nf.format(a.count);
 
