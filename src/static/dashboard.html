@@ -47,12 +47,25 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 16px;
+      margin-bottom: 12px
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
     }
 
     .lists {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
+    }
+
+    .lists .card {
+      margin-bottom: 0;
+    }
+
+    .lists {
+      margin-bottom: 12px;
     }
 
     ul {
@@ -124,7 +137,15 @@
     td[data-rule="auth_limit_hit"] {
       color: var(--critical);
     }
-    
+
+    #rules-card {
+      grid-column: 1 / -1;
+    }
+
+    #rules-card li {
+      grid-template-columns: 12rem 1fr;
+      margin-bottom: 0;
+    }
   </style>
 </head>
 
@@ -157,6 +178,13 @@
       <h2>Top Usernames</h2>
       <ul id="username-list"></ul>
     </section>
+    <section class="card" id="rules-card">
+      <h2>Alerts By Rule (24hr)</h2>
+      <ul id="rule-list">
+
+      </ul>
+    </section>
+
   </div>
 
   <section class="card">
@@ -181,6 +209,7 @@
       <tbody id="alerts-body"></tbody>
     </table>
   </section>
+
 
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"
@@ -280,6 +309,7 @@
           renderList(document.getElementById("ip-list"), s.top_ips);
           renderList(document.getElementById("username-list"), s.top_usernames);
           renderList(document.getElementById("event-list"), s.event_types);
+          renderList(document.getElementById("rule-list"), s.alerts_by_rule);
 
           renderHeartbeat(getHeartbeat(s.last_event_at));
 

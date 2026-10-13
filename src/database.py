@@ -280,6 +280,16 @@ def get_stats(hours: int = 24, top_n: int = 10):
                ORDER BY n DESC"""
         )
 
+        alerts_by_rule = rows(
+            """SELECT rule_name, count(*) AS rule_count
+            FROM alerts
+            WHERE triggered_at >= ?
+            GROUP BY rule_name
+            ORDER BY rule_count DESC
+            """,
+            (start.strftime("%Y-%m-%d %H:%M:%S"),)
+        )
+
         top_ips = rows(
             """SELECT source_ip, COUNT(*) AS attempts
                FROM parsed_events
@@ -331,4 +341,5 @@ def get_stats(hours: int = 24, top_n: int = 10):
         "top_ips": [{"label": r[0], "count": r[1]} for r in top_ips],
         "top_usernames": [{"label": r[0], "count": r[1]} for r in top_usernames],
         "timeline": timeline,
+        "alerts_by_rule": [{"label": r[0], "count": r[1]} for r in alerts_by_rule],
     }
