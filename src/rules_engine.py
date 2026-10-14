@@ -26,7 +26,6 @@ def run_rules():
         if matches:
             for match in matches:
                 # Grouped rules (group_by_ip=True) return (source_ip, count);
-                # ungrouped rules (e.g. rate_spike) return just (count,) since
                 # there's no single entity to attribute the count to.
                 if len(match) == 2:
                     matched_entity, count = match
