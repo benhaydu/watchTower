@@ -1,5 +1,6 @@
 import yaml
 from database import check_threshold_rule, insert_alert, is_suppressed
+import os
 
 def load_rules(path="rules.yaml"):
     with open(path, "r") as f:
@@ -7,6 +8,7 @@ def load_rules(path="rules.yaml"):
     return config["rules"]
 
 def run_rules():
+    known_ips = {ip.strip() for ip in os.getenv("WATCHTOWER_IGNORE_IPS", "").split(",") if ip.strip()}
     rules = load_rules()
     for rule in rules:
         name = rule["name"]
@@ -23,6 +25,12 @@ def run_rules():
 
         matches = check_threshold_rule(event_type, threshold, window_seconds, distinct_column, group_by_ip, username)
 
+        if rule.get("ignore_known_ips"):
+            filtered = []
+            for m in matches:
+                if (m[0] not in known_ips):       
+                    filtered.append(m)
+            matches = filtered
         if matches:
             for match in matches:
                 # Grouped rules (group_by_ip=True) return (source_ip, count);

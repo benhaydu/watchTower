@@ -15,3 +15,16 @@ rules:
     event_type: invalid_user
     threshold: 5
     window_seconds: 3600
+
+  - name: ssh_login
+    event_type: accepted_publickey
+    threshold: 1
+    window_seconds: 3600
+    group_by_ip: true
+    ignore_known_ips: true     
+
+  - name: password_login
+    event_type: accepted_password
+    threshold: 1
+    window_seconds: 3600
+    group_by_ip: true
