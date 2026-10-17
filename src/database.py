@@ -1,6 +1,11 @@
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+
+
+TRIPWIRE_RULES = ("ssh_login", "password_login")      # module level, database.py
+TRIPWIRE_DAYS = 7
+
 def init_db():
     conn = sqlite3.connect("app_database.db")
     cursor = conn.cursor()
@@ -255,6 +260,7 @@ def get_stats(hours: int = 24, top_n: int = 10):
     # [1] The time window
     now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start = now - timedelta(hours=hours)
+    tripwire_start = now - timedelta(days=TRIPWIRE_DAYS)
 
     # [2] The connection
     conn = sqlite3.connect("file:app_database.db?mode=ro", uri=True)
@@ -323,6 +329,15 @@ def get_stats(hours: int = 24, top_n: int = 10):
         last_event_at = rows(
             "SELECT strftime('%Y-%m-%dT%H:%M:%SZ', MAX(received_at)) FROM logs"
         )[0][0]
+        
+        placeholders = ", ".join(["?"] * len(TRIPWIRE_RULES))
+        tripwires = rows(
+            f"""SELECT rule_name, matched_entity, triggered_at
+            FROM alerts
+            WHERE rule_name IN ({placeholders}) AND triggered_at >= ?
+            ORDER BY triggered_at DESC""",
+            (*TRIPWIRE_RULES, tripwire_start.strftime("%Y-%m-%d %H:%M:%S")),                          
+        )
     finally:
         conn.close()
 
@@ -342,4 +357,5 @@ def get_stats(hours: int = 24, top_n: int = 10):
         "top_usernames": [{"label": r[0], "count": r[1]} for r in top_usernames],
         "timeline": timeline,
         "alerts_by_rule": [{"label": r[0], "count": r[1]} for r in alerts_by_rule],
+        "tripwires": [{"rule_name": r[0], "matched_entity": r[1], "triggered_at": r[2]} for r in tripwires],
     }

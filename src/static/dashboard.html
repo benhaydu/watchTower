@@ -146,6 +146,29 @@
       grid-template-columns: 12rem 1fr;
       margin-bottom: 0;
     }
+
+    .tiles {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 12px;
+      grid-template-columns: repeat(2, 1fr)
+    }
+
+    .tiles .card {
+      margin-bottom: 0;
+    }
+
+    .tile[data-state="ok"] {
+      border-color: var(--good);
+    }
+
+    .tile[data-state="alarm"] {
+      border-color: var(--critical);
+    }
+
+    .tile[data-state="unknown"] {
+      border-color: var(--muted);
+    }
   </style>
 </head>
 
@@ -155,10 +178,27 @@
     <input id="key-input" type="password" placeholder="API key">
     <button type="submit">Open</button>
   </form>
+
+
+
   <div class="dashboard-header">
     <h3>Total Events: <span id="event-count">-</span></h3>
     <h3>Total alerts: <span id="alert-count">-</span></h3>
     <h3>Unique ips: <span id="ip-count">-</span></h3>
+  </div>
+
+  <div class="tiles">
+    <section class="card tile" data-rule="ssh_login" data-state="unknown">
+      <h2>New-IP logins</h2>
+      <div class="tile-status">-</div>
+      <div class="tile-detail"></div>
+    </section>
+
+    <section class="card tile" data-rule="password_login" data-state="unknown">
+      <h2>Password logins</h2>
+      <div class="tile-status">-</div>
+      <div class="tile-detail"></div>
+    </section>
   </div>
 
 
@@ -227,6 +267,41 @@
       return new Date(s.replace(" ", "T") + "Z");
     }
 
+    function renderTripwires(rows, heartbeatState) {
+
+      for (const tile of document.querySelectorAll(".tile")) {
+        const rule = tile.dataset.rule
+        const status = tile.querySelector(".tile-status");
+        const detail = tile.querySelector(".tile-detail");
+
+        if (!Array.isArray(rows)) {
+          tile.setAttribute("data-state", "unknown");
+          status.textContent = "Unknown, no new data";
+          detail.textContent = ""
+          continue;
+        }
+
+        const hits = rows.filter(row => row.rule_name === rule)
+
+        if (hits.length > 0) {
+          // ALARM: any alert at all. hits[0] is the newest (the backend sorts newest first)
+          // TODO: tile.dataset.state, status text, detail text (IP + time)
+          tile.setAttribute("data-state", "alarm");
+          status.textContent = hits.length + (hits.length === 1 ? " alert" : " alerts");
+          detail.textContent = hits[0].matched_entity + " time: " + parseDbTime(hits[0].triggered_at).toLocaleString();
+        } else if (heartbeatState !== "live") {
+          // UNKNOWN: no alerts, but we can't trust "no alerts" if data has stopped
+          tile.setAttribute("data-state", "unknown");
+          status.textContent = "Unknown, no new data";
+          detail.textContent = ""
+        } else {
+          tile.setAttribute("data-state", "ok");
+          status.textContent = "No new alerts"
+          detail.textContent = "None in the last 7 days"
+          // OK: no alerts and the pipeline is alive
+        }
+      }
+    }
 
     function renderTimeline(points) {
       timelinePoints = points;
@@ -304,6 +379,7 @@
         const res = await fetch("/stats?hours=24", { headers: { "X-API-Key": key } });
         if (res.ok) {
           const s = await res.json();
+
           renderTimeline(s.timeline);
 
           renderList(document.getElementById("ip-list"), s.top_ips);
@@ -311,8 +387,9 @@
           renderList(document.getElementById("event-list"), s.event_types);
           renderList(document.getElementById("rule-list"), s.alerts_by_rule);
 
-          renderHeartbeat(getHeartbeat(s.last_event_at));
-
+          const heartbeatState = getHeartbeat(s.last_event_at)
+          renderHeartbeat(heartbeatState);
+          renderTripwires(s.tripwires, heartbeatState)
 
           document.getElementById("msg").textContent = "";
           if (s.totals) {
