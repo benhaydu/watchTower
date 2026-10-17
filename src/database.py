@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta, timezone
+import os
 
 
 
@@ -261,6 +262,8 @@ def get_stats(hours: int = 24, top_n: int = 10):
     now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start = now - timedelta(hours=hours)
     tripwire_start = now - timedelta(days=TRIPWIRE_DAYS)
+    known_ips = {ip.strip() for ip in os.getenv("WATCHTOWER_IGNORE_IPS", "").split(",") if ip.strip()}
+    ip_placeholders = ", ".join(["?"] * len(known_ips))
 
     # [2] The connection
     conn = sqlite3.connect("file:app_database.db?mode=ro", uri=True)
@@ -297,25 +300,27 @@ def get_stats(hours: int = 24, top_n: int = 10):
         )
 
         top_ips = rows(
-            """SELECT source_ip, COUNT(*) AS attempts
+            f"""SELECT source_ip, COUNT(*) AS attempts
                FROM parsed_events
                WHERE source_ip IS NOT NULL
-                 AND event_type IN ('failed_password', 'invalid_user')
+                 AND source_ip NOT IN ({ip_placeholders})
+                 AND event_type NOT IN ('accepted_publickey', 'accepted_password', 'sudo_command', 'system_session', 'system_reboot')
                GROUP BY source_ip
                ORDER BY attempts DESC
                LIMIT ?""",
-            (top_n,),
+            (*known_ips, top_n),
         )
 
         top_usernames = rows(
-            """SELECT username, COUNT(*) AS attempts
+            f"""SELECT username, COUNT(*) AS attempts
                FROM parsed_events
                WHERE username IS NOT NULL
-                 AND event_type IN ('failed_password', 'invalid_user')
+                 AND (source_ip IS NULL OR source_ip NOT IN ({ip_placeholders}))
+                 AND event_type NOT IN ('accepted_publickey', 'accepted_password', 'sudo_command')
                GROUP BY username
                ORDER BY attempts DESC
                LIMIT ?""",
-            (top_n,),
+            (*known_ips, top_n),
         )
 
         hourly = rows(

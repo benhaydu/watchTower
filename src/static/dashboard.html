@@ -137,6 +137,12 @@
     td[data-rule="auth_limit_hit"] {
       color: var(--critical);
     }
+    td[data-rule="password_login"]{
+       color: var(--critical);
+    }
+    td[data-rule="ssh_login"]{
+       color: var(--warning);
+    }
 
     #rules-card {
       grid-column: 1 / -1;
@@ -401,12 +407,18 @@
         } else if (res.status === 401) {
           localStorage.removeItem("watchtower_key");
           document.getElementById("msg").textContent = "That key was rejected";
+          renderTripwires(null, "none");
+          renderHeartbeat("none")
         } else {
           document.getElementById("msg").textContent = "Server error (" + res.status + ").";
+          renderTripwires(null, "none");
+          renderHeartbeat("none")
         }
 
       } catch (error) {
         document.getElementById("msg").textContent = "Error loading data: " + error.message;
+        renderTripwires(null, "none");
+        renderHeartbeat("none")
       }
       try {
         const res = await fetch("/alerts?limit=15", { headers: { "X-API-Key": key } })
