@@ -48,6 +48,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+def enrich(rows, ip_key):
+    for row in rows:
+        info = lookup_ip(row[ip_key], COUNTRY_READER, ASN_READER)
+        row.update(info)
+
+    return rows
+
 @app.post("/ingest", dependencies=[Depends(verify_api_key)])
 async def ingest(batch: LogBatch):
     log_ids = insert_logs(batch.source, batch.logs)
@@ -61,16 +68,17 @@ async def ingest(batch: LogBatch):
 
 @app.get("/alerts", response_model=list[AlertOut], dependencies=[Depends(verify_api_key)])
 async def alerts(limit: int = 100):
-    return get_alerts(limit)
+    return enrich(get_alerts(limit), "matched_entity")
+
 
 @app.get("/stats", dependencies=[Depends(verify_api_key)])
 def stats(hours: int = Query(24, ge=1, le=168)):
     data = get_stats(hours)
-    for row in data["top_ips"]:
-        info = lookup_ip(row["label"], COUNTRY_READER, ASN_READER)
-        row.update(info)
+    enrich(data["top_ips"], "label")
+    enrich(data["tripwires"], "matched_entity")
 
     return data
+
 
 # Deliberately NOT behind verify_api_key: this page has no data of its own --
 # it's a static shell whose JS asks the viewer for the key once (kept in the
