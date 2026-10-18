@@ -11,6 +11,8 @@ class FakeReader:
         self.records = records
 
     def get(self, ip):
+        if not isinstance(ip, str):
+            raise TypeError("argument must be a string")
         if ip == "not-an-ip":
             raise ValueError(f"{ip!r} does not appear to be an IPv4 or IPv6 address")
         return self.records.get(ip)
@@ -29,6 +31,8 @@ ASN = FakeReader({
 
 
 # ---- lookup_ip ----
+def test_none_ip_gives_all_none():
+    assert lookup_ip(None, COUNTRY, ASN) == EMPTY
 
 def test_full_hit():
     assert lookup_ip("8.8.8.8", COUNTRY, ASN) == {

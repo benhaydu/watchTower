@@ -26,7 +26,7 @@ def lookup_ip(ip, country_reader, asn_reader):
     if country_reader is not None:
         try:
             record = country_reader.get(ip)
-        except ValueError:                   
+        except (ValueError, TypeError):                   
             return result
         else:
             if record:                # None for private/unknown IPs
@@ -35,7 +35,7 @@ def lookup_ip(ip, country_reader, asn_reader):
     if asn_reader is not None:
         try:
             record = asn_reader.get(ip)
-        except ValueError:
+        except (ValueError, TypeError):
             return result
         else:
             if record:              
