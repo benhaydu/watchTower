@@ -12,6 +12,11 @@ from database import init_db, insert_logs, insert_parsed_logs, get_alerts, get_s
 from parser import parse
 from rules_engine import run_rules
 
+from enrichment import open_reader, lookup_ip
+
+COUNTRY_READER = open_reader("WATCHTOWER_GEOIP_COUNTRY_DB")
+ASN_READER = open_reader("WATCHTOWER_GEOIP_ASN_DB")
+
 RULES_INTERVAL_SECONDS = 60
 
 scheduler = BackgroundScheduler()
@@ -60,8 +65,12 @@ async def alerts(limit: int = 100):
 
 @app.get("/stats", dependencies=[Depends(verify_api_key)])
 def stats(hours: int = Query(24, ge=1, le=168)):
-    return get_stats(hours)
+    data = get_stats(hours)
+    for row in data["top_ips"]:
+        info = lookup_ip(row["label"], COUNTRY_READER, ASN_READER)
+        row.update(info)
 
+    return data
 
 # Deliberately NOT behind verify_api_key: this page has no data of its own --
 # it's a static shell whose JS asks the viewer for the key once (kept in the
